@@ -27,6 +27,9 @@ const API_LATEST = `https://api.github.com/repos/${UPSTREAM_REPO}/releases/lates
 const SLIPNET_REPO = 'mirzaaghazadeh/SlipNet';
 const SLIPNET_API_LATEST = `https://api.github.com/repos/${SLIPNET_REPO}/releases/latest`;
 
+const FINDNS_REPO = 'SamNet-dev/findns';
+const FINDNS_API_LATEST = `https://api.github.com/repos/${FINDNS_REPO}/releases/latest`;
+
 function parseArgs(argv) {
   const args = { platform: 'all', arch: null };
   for (let i = 2; i < argv.length; i++) {
@@ -171,6 +174,46 @@ async function main() {
     const dest = path.join(outDir, mapping.outName);
     // eslint-disable-next-line no-console
     console.log(`⬇️  ${mapping.assetName} -> binaries/${mapping.outName} (release: ${slipnetTag})`);
+    await downloadToFile(asset.browser_download_url, dest);
+  }
+
+  // --- Download FindNS binaries ---
+  // eslint-disable-next-line no-console
+  console.log('\n📦 Downloading FindNS (DNS resolver scanner) binaries...');
+
+  let findnsRelease;
+  try {
+    findnsRelease = await fetchJson(FINDNS_API_LATEST);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`⚠️  Could not fetch FindNS release: ${err?.message || err}. Skipping FindNS binaries.`);
+    // eslint-disable-next-line no-console
+    console.log('✅ Done. Binaries are in ./binaries/');
+    return;
+  }
+
+  const findnsTag = findnsRelease?.tag_name || 'latest';
+  const findnsAssets = Array.isArray(findnsRelease?.assets) ? findnsRelease.assets : [];
+
+  const findnsMappings = {
+    'mac-arm64': { assetName: 'findns-darwin-arm64', outName: 'findns-darwin-arm64' },
+    'mac-intel': { assetName: 'findns-darwin-amd64', outName: 'findns-darwin-amd64' },
+    'linux':     { assetName: 'findns-linux-amd64',  outName: 'findns-linux-amd64' },
+    'win':       { assetName: 'findns-windows-amd64.exe', outName: 'findns-windows-amd64.exe' }
+  };
+
+  for (const t of targets) {
+    const mapping = findnsMappings[t];
+    if (!mapping) continue;
+    const asset = findnsAssets.find((a) => a && a.name === mapping.assetName);
+    if (!asset || !asset.browser_download_url) {
+      // eslint-disable-next-line no-console
+      console.warn(`⚠️  Missing FindNS asset "${mapping.assetName}" in ${FINDNS_REPO} release (${findnsTag}). Skipping.`);
+      continue;
+    }
+    const dest = path.join(outDir, mapping.outName);
+    // eslint-disable-next-line no-console
+    console.log(`⬇️  ${mapping.assetName} -> binaries/${mapping.outName} (release: ${findnsTag})`);
     await downloadToFile(asset.browser_download_url, dest);
   }
 

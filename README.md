@@ -3,7 +3,7 @@
 
 
 <div align="center">
-  <img src="screen_new.png" alt="SlipStream GUI Screenshot" width="800">
+  <img src="screeen_1-4-0.png" alt="SlipStream GUI Screenshot" width="800">
 </div>
 
 
@@ -44,6 +44,7 @@
 - **Install** the app from the latest release
 - **Set your server** (`Domain`) and `DNS Resolver` (or keep defaults for testing)
 - **DNS Checker (optional)**: run it, and click **"Use"** on any **OK** row to set your `DNS Resolver`
+- **FindNS Scanner (advanced, NoizDNS users)**: open **FindNS** from the header to scan public DNS resolvers for tunnel compatibility and click **"Use"** to apply a result as your `DNS Resolver`
 - **Start VPN** and watch the **Status** indicators turn “Running”
 - **Verify** with “Test Proxy Connection” and check the **Logs** panel if needed
 - **Optional**: Share your VPN over Wi‑Fi to your phone using the built-in HTTP proxy (`8080`)
@@ -115,6 +116,17 @@ That's it! No additional setup required.
 - **Test Connection**: Use the "Test Proxy Connection" button to verify functionality
 - **Stop VPN**: Click "Stop VPN" when you want to disconnect
 
+### NoizDNS (SlipNet) Mode (Optional)
+
+If your server admin gives you a `slipnet://...` URL (from NoizDNS / SlipNet), you can use the alternative **SlipNet (NoizDNS)** connection mode:
+
+1. In **Configuration → Connection Type**, select **SlipNet (NoizDNS)** instead of **SlipStream**
+2. Paste your `slipnet://BASE64...` URL into **SlipNet URL**
+3. (Optional) Set a **DNS Server** for SlipNet lookups (for example a tunnel-friendly resolver)
+4. Click **Start VPN** – the rest of the workflow (status, logs, proxy sharing) is the same as SlipStream mode
+
+If you are not sure what NoizDNS/SlipNet is, you can safely ignore this option and keep the default **SlipStream** mode.
+
 ### Setting Up a SlipStream Server
 
 To use SlipStream GUI, you need a SlipStream server running. For detailed instructions on deploying your own SlipStream server, check out:
@@ -163,7 +175,9 @@ bash <(curl -Ls https://raw.githubusercontent.com/AliRezaBeigy/slipstream-rust-d
 - 🔍 **Verbose Logging**: Optional detailed logging for debugging
 - 🧪 **Connection Testing**: Built-in proxy connection tester
 - 📊 **Real-Time Status**: Monitor VPN connection status at a glance
- - 🌐 **Concurrent DNS Checker**: Tests many DNS servers at once and lets you apply any **OK** result with one click
+- 🌐 **Concurrent DNS Checker**: Tests many DNS servers at once and lets you apply any **OK** result with one click
+- 🛰️ **NoizDNS (SlipNet) Mode**: Alternate connection mode for DNS-tunnel transports using `slipnet://` URLs
+- 🧭 **FindNS Scanner**: Fetches and ranks public DNS resolvers for tunnels and lets you apply a result directly as your `DNS Resolver`
 
 ---
 
@@ -322,7 +336,7 @@ npm install
 ### Development
 
 ```bash
-# Download the latest SlipStream client binaries (recommended)
+# Download the latest SlipStream, SlipNet (NoizDNS) and FindNS binaries (recommended)
 npm run download:binaries
 
 # Run in development mode
@@ -332,7 +346,7 @@ npm start
 ### Building
 
 ```bash
-# Download the latest SlipStream client binaries (recommended)
+# Download the latest SlipStream, SlipNet (NoizDNS) and FindNS binaries (recommended)
 npm run download:binaries
 
 # Build for macOS
@@ -457,6 +471,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔗 Related Projects
 
 - **[slipstream-rust-deploy](https://github.com/AliRezaBeigy/slipstream-rust-deploy)**: Deploy your own SlipStream server
+- **[SlipNet](https://github.com/anonvector/SlipNet)**: Android VPN client with DNS tunneling (DNSTT, NoizDNS & Slipstream), NaiveProxy, SSH, Tor, and DoH — featuring a built-in DNS scanner
+- **[findns](https://github.com/SamNet-dev/findns)**: Fast DNS tunnel resolver scanner — find working resolvers for dnstt, DoH, and other DNS tunnel tools
 
 ---
 

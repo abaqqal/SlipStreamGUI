@@ -111,9 +111,8 @@
         }
 
         .main-panel {
-            width: 470px;
-            min-width: 430px;
-            max-width: 510px;
+            flex: 1;
+            min-width: 0;
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
             display: flex;
@@ -1164,6 +1163,72 @@
             transform: none;
         }
 
+        /* ===================== FINDNS MODAL ===================== */
+        #findnsModal .modal-content { padding: 0; max-width: 700px; }
+
+        #findnsModal .modal-header {
+            padding: 16px 24px;
+            margin-bottom: 0;
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #findnsModal .findns-body {
+            padding: 20px 24px 24px;
+        }
+
+        .findns-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .findns-options .form-group {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        .findns-toggle-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 14px;
+            align-items: center;
+        }
+
+        .findns-toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .findns-toggle-item input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent);
+        }
+
+        .findns-log {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            background: var(--log-bg);
+            color: var(--log-text);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            max-height: 100px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .findns-log::-webkit-scrollbar { width: 5px; }
+        .findns-log::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
         /* ===================== INTRO MODAL ===================== */
         .intro-modal {
             display: flex;
@@ -1502,6 +1567,7 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button class="dns-btn" onclick="showFindns()" title="FindNS Scanner - Find best DNS resolvers">FindNS</button>
                     <button class="dns-btn" onclick="showDnsChecker()" title="DNS Checker">DNS Check</button>
                     <a href="#" onclick="openGitHub(); return false;" class="header-btn github-btn" title="GitHub" id="githubBtn">
                         <svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
@@ -1603,6 +1669,23 @@
             <div class="settings-section">
                 <div class="settings-title">Configuration</div>
                 <div class="settings-card">
+                    <!-- Connection Type and System Proxy first -->
+                    <div class="settings-item">
+                        <div class="form-group">
+                            <label class="form-label">Connection Type</label>
+                            <div class="connection-type-selector" id="connectionTypeSelector">
+                                <button class="conn-type-btn active" data-type="slipstream" onclick="setConnectionType('slipstream')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                    SlipStream
+                                </button>
+                                <button class="conn-type-btn" data-type="slipnet" onclick="setConnectionType('slipnet')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    SlipNet (NoizDNS)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="settings-item">
                         <div class="settings-row">
                             <div>
@@ -1624,52 +1707,38 @@
                         </div>
                     </div>
 
-                    <div class="form-group proxy-auth-section">
-                        <label class="form-label">
-                            <span>Proxy Authentication</span>
-                            <label class="toggle-container">
-                                <input type="checkbox" id="proxyAuthToggle" disabled>
-                                <span class="toggle-slider"></span>
+                    <div id="socks5AuthSection">
+                        <div class="form-group proxy-auth-section">
+                            <label class="form-label">
+                                <span>Proxy Authentication</span>
+                                <label class="toggle-container">
+                                    <input type="checkbox" id="proxyAuthToggle" disabled>
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </label>
-                        </label>
-                    </div>
-                    <div class="form-group proxy-auth-section" id="proxyAuthFields" style="display:none;">
-                        <input type="text" class="form-input" id="proxyAuthUsername" placeholder="username" autocomplete="off" spellcheck="false">
-                        <input type="password" class="form-input" id="proxyAuthPassword" placeholder="password" autocomplete="new-password">
-                    </div>
+                        </div>
+                        <div class="form-group proxy-auth-section" id="proxyAuthFields" style="display:none;">
+                            <input type="text" class="form-input" id="proxyAuthUsername" placeholder="username" autocomplete="off" spellcheck="false">
+                            <input type="password" class="form-input" id="proxyAuthPassword" placeholder="password" autocomplete="new-password">
+                        </div>
 
-                    <div class="settings-item">
-                        <div class="settings-row">
-                            <div>
-                                <div class="settings-item-label">Authentication</div>
-                                <div class="settings-item-desc">SOCKS5 upstream username/password</div>
+                        <div class="settings-item">
+                            <div class="settings-row">
+                                <div>
+                                    <div class="settings-item-label">Authentication</div>
+                                    <div class="settings-item-desc">SOCKS5 upstream username/password</div>
+                                </div>
+                                <label class="toggle-container">
+                                    <input type="checkbox" id="socks5AuthToggle" onchange="toggleSocks5Auth()">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
-                            <label class="toggle-container">
-                                <input type="checkbox" id="socks5AuthToggle" onchange="toggleSocks5Auth()">
-                                <span class="toggle-slider"></span>
-                            </label>
                         </div>
-                    </div>
-                    <div id="socks5AuthFields" style="display:none;">
-                        <div class="settings-item" style="padding-top: 0; border-bottom: 1px solid var(--border-color);">
-                            <input type="text" class="form-input" id="socks5AuthUsername" placeholder="Username" autocomplete="off" spellcheck="false" style="margin-bottom: 8px;">
-                            <input type="password" class="form-input" id="socks5AuthPassword" placeholder="Password" autocomplete="new-password">
-                            <div class="settings-note">Changes take effect on next VPN start.</div>
-                        </div>
-                    </div>
-
-                    <div class="settings-item">
-                        <div class="form-group">
-                            <label class="form-label">Connection Type</label>
-                            <div class="connection-type-selector" id="connectionTypeSelector">
-                                <button class="conn-type-btn active" data-type="slipstream" onclick="setConnectionType('slipstream')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                                    SlipStream
-                                </button>
-                                <button class="conn-type-btn" data-type="slipnet" onclick="setConnectionType('slipnet')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                    SlipNet (NoizDNS)
-                                </button>
+                        <div id="socks5AuthFields" style="display:none;">
+                            <div class="settings-item" style="padding-top: 0; border-bottom: 1px solid var(--border-color);">
+                                <input type="text" class="form-input" id="socks5AuthUsername" placeholder="Username" autocomplete="off" spellcheck="false" style="margin-bottom: 8px;">
+                                <input type="password" class="form-input" id="socks5AuthPassword" placeholder="Password" autocomplete="new-password">
+                                <div class="settings-note">Changes take effect on next VPN start.</div>
                             </div>
                         </div>
                     </div>
@@ -1706,14 +1775,6 @@
                                 <label class="form-label">DNS Server <span style="color: var(--text-muted); font-weight: normal;">(optional)</span></label>
                                 <input type="text" class="form-input" id="slipnetDnsInput" placeholder="1.1.1.1">
                                 <div class="settings-help">Custom DNS server for SlipNet lookups</div>
-                            </div>
-                        </div>
-
-                        <div class="settings-item">
-                            <div class="form-group">
-                                <label class="form-label">SOCKS5 Port <span style="color: var(--text-muted); font-weight: normal;">(optional)</span></label>
-                                <input type="text" class="form-input" id="slipnetPortInput" placeholder="5201">
-                                <div class="settings-help">Local SOCKS5 port (default: 5201)</div>
                             </div>
                         </div>
                     </div>
@@ -1808,6 +1869,81 @@
                 </div>
 
                 <div class="dns-muted" id="dnsSummary" style="margin-top: 12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== FINDNS SCANNER MODAL ==================== -->
+    <div class="modal" id="findnsModal" onclick="if(event.target.id === 'findnsModal') closeFindns()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">FindNS Scanner</div>
+                <button class="modal-close" onclick="closeFindns()">&times;</button>
+            </div>
+
+            <div class="findns-body">
+                <div class="dns-warning">
+                    <strong>Important:</strong> Turn off any VPN before scanning. FindNS will fetch public resolver lists and test them for DNS tunnel compatibility.
+                </div>
+
+                <div class="findns-options">
+                    <div class="form-group">
+                        <label class="form-label">Tunnel Domain <span style="color: var(--text-muted); font-weight: normal;">(optional)</span></label>
+                        <input type="text" class="form-input" id="findnsDomainInput" placeholder="t.example.com">
+                        <div class="settings-help">Enables tunnel/EDNS/e2e checks</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Top Results</label>
+                        <input type="number" class="form-input" id="findnsTopInput" value="10" min="1" max="100" style="width: 80px;">
+                    </div>
+                </div>
+
+                <div class="findns-toggle-row">
+                    <label class="findns-toggle-item">
+                        <input type="checkbox" id="findnsLocal" checked>
+                        Include local resolvers (7800+)
+                    </label>
+                    <label class="findns-toggle-item">
+                        <input type="checkbox" id="findnsDoh">
+                        DoH mode
+                    </label>
+                    <label class="findns-toggle-item">
+                        <input type="checkbox" id="findnsSkipPing">
+                        Skip ping
+                    </label>
+                    <label class="findns-toggle-item">
+                        <input type="checkbox" id="findnsSkipNx">
+                        Skip NXDOMAIN check
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="button" id="findnsScanBtn" onclick="startFindnsScan()" style="background: var(--accent); color: white; margin: 0;">Scan</button>
+                    <button class="button" id="findnsStopBtn" onclick="stopFindnsScan()" disabled style="background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border-light); margin: 0;">Stop</button>
+                    <div class="dns-muted" id="findnsStatus" style="margin-left: auto;"></div>
+                </div>
+
+                <div class="findns-log" id="findnsLog"></div>
+
+                <div class="dns-table-wrap" style="margin-top: 14px;">
+                    <table class="dns-table">
+                        <thead>
+                            <tr>
+                                <th>Resolver</th>
+                                <th>Ping</th>
+                                <th>Resolve</th>
+                                <th>EDNS</th>
+                                <th>E2E</th>
+                                <th>Use</th>
+                            </tr>
+                        </thead>
+                        <tbody id="findnsResultsBody">
+                            <tr><td colspan="6" class="dns-muted" style="text-align: center; padding: 20px;">Click "Scan" to find the best DNS resolvers.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="dns-muted" id="findnsSummary" style="margin-top: 12px;"></div>
             </div>
         </div>
     </div>
@@ -2115,6 +2251,14 @@ SlipStream VPN Server</pre>
         }
 
         /* ============ LOGS ============ */
+        const LOG_FUN_MESSAGES = [
+            'Enjoying SlipStream? Star the repo on GitHub!',
+            'Having a good experience? Consider starring the project!',
+            'Like this app? Show your support with a star on GitHub',
+            'Thanks for using SlipStream! Star us if you find it useful',
+            'Secure browsing feels good. Star the repo if you agree!'
+        ];
+
         function clearLogs() {
             const log = document.getElementById('log');
             log.innerHTML = '<div class="log-empty">No activity yet. Start the VPN to see logs.</div>';
@@ -2130,6 +2274,18 @@ SlipStream VPN Server</pre>
             entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             log.appendChild(entry);
             log.scrollTop = log.scrollHeight;
+
+            // Randomly show a fun message during logs (~4% chance, only for non-error)
+            if (!isError && Math.random() < 0.04) {
+                const funMsg = LOG_FUN_MESSAGES[Math.floor(Math.random() * LOG_FUN_MESSAGES.length)];
+                const funEntry = document.createElement('div');
+                funEntry.className = 'log-entry';
+                funEntry.style.color = 'var(--text-muted)';
+                funEntry.style.fontStyle = 'italic';
+                funEntry.textContent = `[${new Date().toLocaleTimeString()}] ${funMsg}`;
+                log.appendChild(funEntry);
+                log.scrollTop = log.scrollHeight;
+            }
         }
 
         /* ============ STATUS ============ */
@@ -2309,8 +2465,7 @@ SlipStream VPN Server</pre>
                 await ipcRenderer.invoke('set-connection-type', {
                     connectionType: currentConnectionType,
                     slipnetUrl: document.getElementById('slipnetUrlInput')?.value?.trim() || '',
-                    slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || '',
-                    slipnetPort: document.getElementById('slipnetPortInput')?.value?.trim() || ''
+                    slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || ''
                 });
             } catch (err) {
                 console.error('Failed to save connection type:', err);
@@ -2351,8 +2506,7 @@ SlipStream VPN Server</pre>
                 resolver, domain, tunMode: false,
                 connectionType: currentConnectionType,
                 slipnetUrl: document.getElementById('slipnetUrlInput')?.value?.trim() || '',
-                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || '',
-                slipnetPort: document.getElementById('slipnetPortInput')?.value?.trim() || ''
+                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || ''
             };
 
             const result = await ipcRenderer.invoke('start-service', servicePayload);
@@ -2410,6 +2564,128 @@ SlipStream VPN Server</pre>
             } finally {
                 testBtn.disabled = false;
                 testBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Test Connection';
+            }
+        }
+
+        /* ============ FINDNS SCANNER ============ */
+        function showFindns() {
+            document.getElementById('findnsModal')?.classList.add('show');
+        }
+        function closeFindns() {
+            document.getElementById('findnsModal')?.classList.remove('show');
+        }
+
+        let findnsRunning = false;
+
+        ipcRenderer.on('findns-progress', (event, line) => {
+            const logEl = document.getElementById('findnsLog');
+            if (logEl) {
+                logEl.style.display = 'block';
+                logEl.textContent += line + '\n';
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+            document.getElementById('findnsStatus').textContent = line.slice(0, 80);
+        });
+
+        async function startFindnsScan() {
+            if (findnsRunning) return;
+
+            // Check if binary is available
+            const check = await ipcRenderer.invoke('findns-check-available');
+            if (!check.available) {
+                addLog('FindNS binary not found. Download from https://github.com/SamNet-dev/findns/releases', true);
+                return;
+            }
+
+            findnsRunning = true;
+            document.getElementById('findnsScanBtn').disabled = true;
+            document.getElementById('findnsStopBtn').disabled = false;
+            document.getElementById('findnsResultsBody').innerHTML = '<tr><td colspan="6" class="dns-muted" style="text-align:center;padding:20px;">Scanning... this may take a few minutes.</td></tr>';
+            document.getElementById('findnsSummary').textContent = '';
+            document.getElementById('findnsLog').textContent = '';
+            document.getElementById('findnsLog').style.display = 'block';
+            document.getElementById('findnsStatus').textContent = 'Starting scan...';
+
+            const domain = document.getElementById('findnsDomainInput')?.value?.trim() || '';
+            const top = parseInt(document.getElementById('findnsTopInput')?.value) || 10;
+            const useLocal = document.getElementById('findnsLocal')?.checked || false;
+            const doh = document.getElementById('findnsDoh')?.checked || false;
+            const skipPing = document.getElementById('findnsSkipPing')?.checked || false;
+            const skipNxdomain = document.getElementById('findnsSkipNx')?.checked || false;
+
+            try {
+                const result = await ipcRenderer.invoke('findns-scan', { domain, top, useLocal, doh, skipPing, skipNxdomain });
+
+                if (result.success && result.data) {
+                    renderFindnsResults(result.data);
+                } else {
+                    document.getElementById('findnsResultsBody').innerHTML =
+                        `<tr><td colspan="6" class="dns-muted" style="text-align:center;padding:20px;color:var(--danger);">${result.error || 'Scan failed'}</td></tr>`;
+                }
+            } catch (err) {
+                document.getElementById('findnsResultsBody').innerHTML =
+                    `<tr><td colspan="6" class="dns-muted" style="text-align:center;padding:20px;color:var(--danger);">Error: ${err.message}</td></tr>`;
+            } finally {
+                findnsRunning = false;
+                document.getElementById('findnsScanBtn').disabled = false;
+                document.getElementById('findnsStopBtn').disabled = true;
+                document.getElementById('findnsStatus').textContent = 'Done';
+            }
+        }
+
+        async function stopFindnsScan() {
+            await ipcRenderer.invoke('findns-stop');
+            findnsRunning = false;
+            document.getElementById('findnsScanBtn').disabled = false;
+            document.getElementById('findnsStopBtn').disabled = true;
+            document.getElementById('findnsStatus').textContent = 'Stopped';
+        }
+
+        function renderFindnsResults(data) {
+            const tbody = document.getElementById('findnsResultsBody');
+            const passed = data.passed || [];
+
+            if (passed.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="dns-muted" style="text-align:center;padding:20px;">No resolvers passed all checks.</td></tr>';
+                document.getElementById('findnsSummary').textContent = 'No resolvers found.';
+                return;
+            }
+
+            let html = '';
+            passed.forEach((r, i) => {
+                const ip = r.ip || 'unknown';
+                const m = r.metrics || {};
+                const pingMs = m.ping_ms != null ? m.ping_ms + ' ms' : '-';
+                const resolveMs = m.resolve_ms != null ? m.resolve_ms + ' ms' : '-';
+                const edns = m.edns_max != null ? m.edns_max + ' B' : '-';
+                const e2eMs = m.e2e_ms != null ? m.e2e_ms + ' ms' : '-';
+
+                html += `<tr>
+                    <td style="font-family:monospace;font-weight:600;">${ip}</td>
+                    <td class="${m.ping_ms != null ? 'dns-status-ok' : 'dns-muted'}">${pingMs}</td>
+                    <td class="${m.resolve_ms != null ? 'dns-status-ok' : 'dns-muted'}">${resolveMs}</td>
+                    <td class="${m.edns_max >= 900 ? 'dns-status-ok' : m.edns_max ? 'dns-status-warn' : 'dns-muted'}">${edns}</td>
+                    <td class="${m.e2e_ms != null ? 'dns-status-ok' : 'dns-muted'}">${e2eMs}</td>
+                    <td><button class="dns-use-btn" onclick="useFindnsResolver('${ip}')">Use</button></td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            document.getElementById('findnsSummary').textContent = `Found ${passed.length} resolver${passed.length !== 1 ? 's' : ''} that passed all checks.`;
+        }
+
+        async function useFindnsResolver(ip) {
+            const resolver = ip + ':53';
+            try {
+                const result = await ipcRenderer.invoke('set-resolver', { resolver });
+                if (result?.success) {
+                    document.getElementById('resolverInput').value = result.resolver;
+                    addLog(`FindNS: set DNS Resolver to ${result.resolver}`, false, true);
+                    closeFindns();
+                } else {
+                    addLog(`FindNS: failed to save resolver (${result?.error || 'Unknown error'})`, true);
+                }
+            } catch (err) {
+                addLog(`FindNS: failed to save resolver (${err?.message || String(err)})`, true);
             }
         }
 
@@ -2744,7 +3020,6 @@ SlipStream VPN Server</pre>
                 }
                 document.getElementById('slipnetUrlInput').value = ws.slipnetUrl || '';
                 document.getElementById('slipnetDnsInput').value = ws.slipnetDns || '';
-                document.getElementById('slipnetPortInput').value = ws.slipnetPort || '';
             }
             renderWorkspaceTabs();
             persistWorkspaces();
@@ -2761,7 +3036,6 @@ SlipStream VPN Server</pre>
             ws.connectionType = currentConnectionType;
             ws.slipnetUrl = document.getElementById('slipnetUrlInput')?.value?.trim() || '';
             ws.slipnetDns = document.getElementById('slipnetDnsInput')?.value?.trim() || '';
-            ws.slipnetPort = document.getElementById('slipnetPortInput')?.value?.trim() || '';
         }
 
         async function addWorkspace() {
@@ -2779,8 +3053,7 @@ SlipStream VPN Server</pre>
                 proxyBypassList: (document.getElementById('proxyBypassInput')?.value || '').split('\n').map(s => s.trim()).filter(Boolean),
                 connectionType: currentConnectionType,
                 slipnetUrl: document.getElementById('slipnetUrlInput')?.value?.trim() || '',
-                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || '',
-                slipnetPort: document.getElementById('slipnetPortInput')?.value?.trim() || ''
+                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || ''
             };
             wsData.push(newWs);
             wsActiveId = id;
@@ -2817,7 +3090,6 @@ SlipStream VPN Server</pre>
                     }
                     document.getElementById('slipnetUrlInput').value = next.slipnetUrl || '';
                     document.getElementById('slipnetDnsInput').value = next.slipnetDns || '';
-                    document.getElementById('slipnetPortInput').value = next.slipnetPort || '';
                 }
             }
             renderWorkspaceTabs();
@@ -2854,7 +3126,6 @@ SlipStream VPN Server</pre>
                     }
                     document.getElementById('slipnetUrlInput').value = ws.slipnetUrl || settings.slipnetUrl || '';
                     document.getElementById('slipnetDnsInput').value = ws.slipnetDns || settings.slipnetDns || '';
-                    document.getElementById('slipnetPortInput').value = ws.slipnetPort || settings.slipnetPort || '';
                 }
             }
             renderWorkspaceTabs();
@@ -2933,7 +3204,6 @@ SlipStream VPN Server</pre>
             }
             if (settings.slipnetUrl) document.getElementById('slipnetUrlInput').value = settings.slipnetUrl;
             if (settings.slipnetDns) document.getElementById('slipnetDnsInput').value = settings.slipnetDns;
-            if (settings.slipnetPort) document.getElementById('slipnetPortInput').value = settings.slipnetPort;
 
             const socksUserEl = document.getElementById('socks5AuthUsername');
             const socksPassEl = document.getElementById('socks5AuthPassword');
@@ -2954,10 +3224,8 @@ SlipStream VPN Server</pre>
             // Auto-save SlipNet fields on input
             const slipnetUrlEl = document.getElementById('slipnetUrlInput');
             const slipnetDnsEl = document.getElementById('slipnetDnsInput');
-            const slipnetPortEl = document.getElementById('slipnetPortInput');
             if (slipnetUrlEl) slipnetUrlEl.addEventListener('input', scheduleConnectionTypeSave);
             if (slipnetDnsEl) slipnetDnsEl.addEventListener('input', scheduleConnectionTypeSave);
-            if (slipnetPortEl) slipnetPortEl.addEventListener('input', scheduleConnectionTypeSave);
 
             const proxyStatus = await ipcRenderer.invoke('check-system-proxy');
             const toggle = document.getElementById('systemProxyToggle');

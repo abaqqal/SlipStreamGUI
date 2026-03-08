@@ -37,7 +37,6 @@ let socks5AuthPassword = '';
 let connectionType = 'slipstream';
 let slipnetUrl = ''; // slipnet://BASE64... URI
 let slipnetDns = ''; // optional --dns flag for SlipNet
-let slipnetPort = ''; // optional --port flag for SlipNet (defaults to SOCKS5_PORT)
 // System proxy lifecycle safety (only undo what THIS app enabled)
 let systemProxyEnabledByApp = false;
 let systemProxyServiceName = '';
@@ -117,7 +116,6 @@ function loadSettings() {
       if (settings.connectionType === 'slipstream' || settings.connectionType === 'slipnet') connectionType = settings.connectionType;
       if (typeof settings.slipnetUrl === 'string') slipnetUrl = settings.slipnetUrl;
       if (typeof settings.slipnetDns === 'string') slipnetDns = settings.slipnetDns;
-      if (typeof settings.slipnetPort === 'string') slipnetPort = settings.slipnetPort;
     }
   } catch (err) {
     console.error('Failed to load settings:', err);
@@ -147,7 +145,6 @@ function saveSettings(overrides = {}) {
       connectionType: overrides.connectionType ?? connectionType,
       slipnetUrl: overrides.slipnetUrl ?? slipnetUrl,
       slipnetDns: overrides.slipnetDns ?? slipnetDns,
-      slipnetPort: overrides.slipnetPort ?? slipnetPort
     };
 
     // Update in-memory state first so UI actions take effect immediately,
@@ -171,7 +168,6 @@ function saveSettings(overrides = {}) {
     connectionType = (next.connectionType === 'slipstream' || next.connectionType === 'slipnet') ? next.connectionType : 'slipstream';
     slipnetUrl = typeof next.slipnetUrl === 'string' ? next.slipnetUrl : '';
     slipnetDns = typeof next.slipnetDns === 'string' ? next.slipnetDns : '';
-    slipnetPort = typeof next.slipnetPort === 'string' ? next.slipnetPort : '';
 
     fs.writeFileSync(settingsPath, JSON.stringify(next, null, 2));
   } catch (err) {
@@ -329,6 +325,40 @@ function getSlipnetClientPath() {
   return null;
 }
 
+function getFindnsClientPath() {
+  const platform = process.platform;
+  const resourcesPath = app.isPackaged
+    ? path.join(process.resourcesPath)
+    : __dirname;
+
+  if (platform === 'darwin') {
+    const preferred =
+      process.arch === 'arm64' ? 'findns-darwin-arm64' : 'findns-darwin-amd64';
+    const fallback =
+      process.arch === 'arm64' ? 'findns-darwin-amd64' : 'findns-darwin-arm64';
+    const candidates = [
+      path.join(resourcesPath, 'binaries', preferred),
+      path.join(resourcesPath, preferred),
+      path.join(resourcesPath, 'binaries', fallback),
+      path.join(resourcesPath, fallback)
+    ];
+    return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+  } else if (platform === 'win32') {
+    const candidates = [
+      path.join(resourcesPath, 'binaries', 'findns-windows-amd64.exe'),
+      path.join(resourcesPath, 'findns-windows-amd64.exe')
+    ];
+    return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+  } else if (platform === 'linux') {
+    const candidates = [
+      path.join(resourcesPath, 'binaries', 'findns-linux-amd64'),
+      path.join(resourcesPath, 'findns-linux-amd64')
+    ];
+    return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+  }
+  return null;
+}
+
 function startSlipnetClient(url, dnsServer, port) {
   const clientPath = getSlipnetClientPath();
   if (!clientPath) {
@@ -352,7 +382,7 @@ function startSlipnetClient(url, dnsServer, port) {
     }
   }
 
-  const effectivePort = port || String(SOCKS5_PORT);
+  const effectivePort = port || String(SOCKS5_PORT); // SlipNet: default 5201 (no UI prompt)
   const args = ['--port', effectivePort];
   if (dnsServer) {
     args.push('--dns', dnsServer);
@@ -1326,7 +1356,7 @@ async function startService(resolver, domain, tunMode = false) {
       if (!slipnetUrl) {
         throw new Error('SlipNet URL is required. Please enter a slipnet:// URL in the settings.');
       }
-      await startSlipnetClient(slipnetUrl, slipnetDns, slipnetPort);
+      await startSlipnetClient(slipnetUrl, slipnetDns, null); // null = use default SOCKS5 port 5201
     } else {
       await startSlipstreamClient(resolver, domain);
     }
@@ -1538,7 +1568,6 @@ ipcMain.handle('start-service', async (event, settings) => {
   }
   if (typeof settings?.slipnetUrl === 'string') slipnetUrl = settings.slipnetUrl;
   if (typeof settings?.slipnetDns === 'string') slipnetDns = settings.slipnetDns;
-  if (typeof settings?.slipnetPort === 'string') slipnetPort = settings.slipnetPort;
   return await startService(settings?.resolver, settings?.domain, settings?.tunMode || false);
 });
 
@@ -1570,8 +1599,7 @@ ipcMain.handle('get-settings', () => {
     activeWorkspaceId,
     connectionType,
     slipnetUrl,
-    slipnetDns,
-    slipnetPort
+    slipnetDns
   };
 });
 
@@ -1584,9 +1612,8 @@ ipcMain.handle('set-connection-type', (event, payload) => {
     const updates = { connectionType: type };
     if (typeof payload.slipnetUrl === 'string') updates.slipnetUrl = payload.slipnetUrl;
     if (typeof payload.slipnetDns === 'string') updates.slipnetDns = payload.slipnetDns;
-    if (typeof payload.slipnetPort === 'string') updates.slipnetPort = payload.slipnetPort;
     saveSettings(updates);
-    return { success: true, connectionType, slipnetUrl, slipnetDns, slipnetPort };
+    return { success: true, connectionType, slipnetUrl, slipnetDns };
   } catch (err) {
     return { success: false, error: err?.message || String(err) };
   }
@@ -1616,7 +1643,10 @@ ipcMain.handle('save-workspaces', (event, payload) => {
         domain: typeof ws.domain === 'string' && ws.domain ? ws.domain : DOMAIN,
         proxyBypassList: Array.isArray(ws.proxyBypassList)
           ? ws.proxyBypassList.map((x) => String(x)).filter(Boolean)
-          : proxyBypassList
+          : proxyBypassList,
+        connectionType: (ws.connectionType === 'slipstream' || ws.connectionType === 'slipnet') ? ws.connectionType : 'slipstream',
+        slipnetUrl: typeof ws.slipnetUrl === 'string' ? ws.slipnetUrl : '',
+        slipnetDns: typeof ws.slipnetDns === 'string' ? ws.slipnetDns : ''
       }));
 
     let nextActiveId =
@@ -2115,4 +2145,145 @@ ipcMain.handle('dns-check-single', async (event, payload) => {
   } catch (err) {
     return { ok: false, error: err?.message || String(err) };
   }
+});
+
+// ==================== FindNS Scanner ====================
+
+let findnsProcess = null;
+
+ipcMain.handle('findns-check-available', () => {
+  const clientPath = getFindnsClientPath();
+  return { available: !!(clientPath && fs.existsSync(clientPath)), path: clientPath };
+});
+
+ipcMain.handle('findns-scan', async (event, payload) => {
+  const clientPath = getFindnsClientPath();
+  if (!clientPath || !fs.existsSync(clientPath)) {
+    return { success: false, error: 'FindNS binary not found. Download it from https://github.com/SamNet-dev/findns/releases and place it in the ./binaries/ folder.' };
+  }
+
+  // Ensure execute permissions
+  if (process.platform !== 'win32') {
+    try { fs.accessSync(clientPath, fs.constants.X_OK); } catch (_) {
+      fs.chmodSync(clientPath, 0o755);
+    }
+  }
+
+  const domain = String(payload?.domain || '').trim();
+  const top = Number(payload?.top) || 10;
+  const skipPing = !!payload?.skipPing;
+  const skipNxdomain = !!payload?.skipNxdomain;
+  const useLocal = !!payload?.useLocal;
+  const useDoh = !!payload?.doh;
+
+  // Choose a writable working directory for temporary files (packaged apps cannot
+  // write inside app.asar/resources).
+  let workDir;
+  try {
+    workDir = app.getPath('userData');
+    fs.mkdirSync(workDir, { recursive: true });
+  } catch (_) {
+    workDir = process.cwd();
+  }
+  const resolversFile = path.join(workDir, 'findns-resolvers.txt');
+  const resultsFile = path.join(workDir, 'findns-results.json');
+
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      findnsProcess = null;
+      resolve(result);
+    };
+
+    const runScan = () => {
+      let stdout = '';
+      let stderr = '';
+
+      const scanArgs = ['scan', '-i', resolversFile, '-o', resultsFile, '--top', String(top)];
+      if (domain) scanArgs.push('--domain', domain);
+      if (skipPing) scanArgs.push('--skip-ping');
+      if (skipNxdomain) scanArgs.push('--skip-nxdomain');
+      if (useDoh) scanArgs.push('--doh');
+
+      const scanProc = spawn(clientPath, scanArgs, {
+        cwd: workDir,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+      findnsProcess = scanProc;
+
+      scanProc.stdout.on('data', (d) => { stdout += d.toString(); });
+      scanProc.stderr.on('data', (d) => {
+        const line = d.toString().trim();
+        if (line) {
+          stderr += line + '\n';
+          safeSend('findns-progress', line);
+        }
+      });
+
+      scanProc.on('error', (err) => {
+        settle({ success: false, error: `FindNS scan failed: ${err.message}` });
+      });
+
+      scanProc.on('close', (code) => {
+        if (code !== 0) {
+          settle({ success: false, error: stderr.trim() || `FindNS scan exited with code ${code}` });
+          return;
+        }
+        try {
+          const jsonRaw = fs.readFileSync(resultsFile, 'utf8');
+          const data = JSON.parse(jsonRaw);
+          settle({ success: true, data });
+        } catch (err) {
+          settle({ success: false, error: `Failed to read FindNS results: ${err.message}` });
+        }
+      });
+    };
+
+    const fetchArgs = ['fetch', '-o', resolversFile];
+    if (useLocal) fetchArgs.push('--local');
+    if (useDoh) fetchArgs.push('--doh');
+
+    const fetchProc = spawn(clientPath, fetchArgs, {
+      cwd: workDir,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    fetchProc.stderr.on('data', (d) => {
+      const line = d.toString().trim();
+      if (line) safeSend('findns-progress', line);
+    });
+
+    fetchProc.on('error', (err) => {
+      settle({ success: false, error: `FindNS fetch failed: ${err.message}` });
+    });
+
+    fetchProc.on('close', (code) => {
+      if (code !== 0) {
+        settle({ success: false, error: `FindNS fetch exited with code ${code}` });
+        return;
+      }
+      // After successful fetch, run scan using the generated resolvers file.
+      runScan();
+    });
+
+    // Timeout: 5 minutes (covers both fetch + scan)
+    setTimeout(() => {
+      try { if (findnsProcess) findnsProcess.kill(); } catch (_) {}
+      if (!settled) {
+        settle({ success: false, error: 'FindNS scan timed out (5 minutes)' });
+      }
+    }, 5 * 60 * 1000);
+  });
+});
+
+ipcMain.handle('findns-stop', () => {
+  if (findnsProcess) {
+    try { findnsProcess.kill(); } catch (_) {}
+    findnsProcess = null;
+    return { success: true };
+  }
+  return { success: false, error: 'No scan running' };
 });

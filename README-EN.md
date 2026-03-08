@@ -12,6 +12,7 @@
 - **Download & install** the app from the Releases page
 - **Set your server** (`Domain`) and **DNS Resolver** (if needed)
 - **DNS Checker (optional)**: run it, and click **"Use"** on any **OK** row to set your `DNS Resolver`
+- **FindNS Scanner (advanced)**: use the **FindNS** button in the header to scan public DNS resolvers for tunnels and apply the best result as your `DNS Resolver`
 - **Save as Preset**: save your configuration as a named preset for quick switching later
 - **Start VPN** with the **"Start VPN"** button and make sure statuses show **Running**
 - **Verify** with **"Test Proxy Connection"** and check Logs if needed
@@ -43,6 +44,7 @@ If a direct download fails, use the [Releases page](https://github.com/mirzaagha
 
 1. Open **SlipStream GUI**
 2. (Optional) Configure:
+   - **Connection Type**: keep **SlipStream** (default) for normal mode, or choose **SlipNet (NoizDNS)** if your server gives you a `slipnet://...` URL
    - **DNS Resolver**: your DNS server (default: `8.8.8.8:53`)
    - **Domain**: your SlipStream server domain (default: `s.example.com`)
    - **System Proxy**: enable auto system proxy configuration (recommended)
@@ -61,6 +63,34 @@ If you’re not sure which DNS Resolver to use (or DNS hasn’t fully propagated
    - **OK means OK** (no action needed)
    - The **"Use"** button is enabled only for **OK** rows
 5. Click **"Use"** to auto-set your **DNS Resolver** (the app forces port `53`)
+
+---
+
+## 🛰️ NoizDNS / SlipNet Mode (Optional)
+
+If your server admin gives you a `slipnet://...` URL (from NoizDNS / SlipNet), you can use the alternative **SlipNet (NoizDNS)** connection mode:
+
+1. In **Configuration → Connection Type**, choose **SlipNet (NoizDNS)** instead of **SlipStream**
+2. Paste your `slipnet://BASE64...` URL into **SlipNet URL**
+3. (Optional) Set **DNS Server** for SlipNet lookups (for example a tunnel‑friendly resolver)
+4. Click **Start VPN** – the rest of the flow is the same as normal mode
+
+If you are not sure what NoizDNS/SlipNet is, just leave **Connection Type** on **SlipStream**.
+
+---
+
+## 🔍 FindNS Scanner (Advanced)
+
+**FindNS** is a built‑in scanner that helps you find good DNS resolvers for tunnels:
+
+1. Click **FindNS** in the header
+2. (Optional) Enter a **Tunnel Domain** (for example `t.example.com`) to enable tunnel/EDNS/e2e checks
+3. Choose options:
+   - **Include local resolvers**: add a large public resolver list
+   - **DoH mode**: test DNS‑over‑HTTPS resolvers
+   - **Skip ping** / **Skip NXDOMAIN check** if needed
+4. Click **Scan** and wait for results
+5. In the results table, click **Use** on any row to set that resolver as your `DNS Resolver` in the main screen
 
 ---
 

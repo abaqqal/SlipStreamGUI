@@ -1,6 +1,6 @@
 {
   "name": "slipstream-gui",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "description": "SlipStream GUI Client with HTTP Proxy",
   "main": "main.js",
   "scripts": {
@@ -105,6 +105,20 @@
           "filter": [
             "**/*"
           ]
+        },
+        {
+          "from": "binaries/findns-darwin-arm64",
+          "to": "binaries/findns-darwin-arm64",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "binaries/findns-darwin-amd64",
+          "to": "binaries/findns-darwin-amd64",
+          "filter": [
+            "**/*"
+          ]
         }
       ],
       "target": "dmg",
@@ -136,6 +150,13 @@
           "filter": [
             "**/*"
           ]
+        },
+        {
+          "from": "binaries/findns-windows-amd64.exe",
+          "to": "binaries/findns-windows-amd64.exe",
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -158,6 +179,13 @@
         {
           "from": "binaries/slipnet-linux-amd64",
           "to": "binaries/slipnet-linux-amd64",
+          "filter": [
+            "**/*"
+          ]
+        },
+        {
+          "from": "binaries/findns-linux-amd64",
+          "to": "binaries/findns-linux-amd64",
           "filter": [
             "**/*"
           ]

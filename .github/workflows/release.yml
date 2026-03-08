@@ -123,6 +123,37 @@ jobs:
           }
           ls -lh binaries/
 
+      - name: Download latest FindNS binary (DNS resolver scanner)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPO="SamNet-dev/findns"
+          mkdir -p binaries
+
+          if [ "${{ matrix.platform }}" == "mac" ]; then
+            if [ "${{ matrix.arch }}" == "arm64" ]; then
+              ASSET="findns-darwin-arm64"
+            else
+              ASSET="findns-darwin-amd64"
+            fi
+          elif [ "${{ matrix.platform }}" == "linux" ]; then
+            ASSET="findns-linux-amd64"
+          elif [ "${{ matrix.platform }}" == "win" ]; then
+            ASSET="findns-windows-amd64.exe"
+          else
+            echo "Unknown platform: ${{ matrix.platform }}"
+            exit 1
+          fi
+
+          echo "Downloading $ASSET from $REPO..."
+          gh release download --repo "$REPO" --pattern "$ASSET" --dir binaries || {
+            echo "⚠️ Failed to download FindNS binary ($ASSET). FindNS scanner will be unavailable."
+            exit 0
+          }
+          ls -lh binaries/
+
       - name: Verify required SlipStream client binaries
         shell: bash
         run: |
@@ -153,13 +184,16 @@ jobs:
             if [ "${{ matrix.arch }}" == "arm64" ]; then
               chmod +x binaries/slipstream-client-mac-arm64
               [ -f binaries/slipnet-darwin-arm64 ] && chmod +x binaries/slipnet-darwin-arm64
+              [ -f binaries/findns-darwin-arm64 ] && chmod +x binaries/findns-darwin-arm64
             else
               chmod +x binaries/slipstream-client-mac-intel
               [ -f binaries/slipnet-darwin-amd64 ] && chmod +x binaries/slipnet-darwin-amd64
+              [ -f binaries/findns-darwin-amd64 ] && chmod +x binaries/findns-darwin-amd64
             fi
           elif [ "${{ matrix.platform }}" == "linux" ]; then
             chmod +x binaries/slipstream-client-linux
             [ -f binaries/slipnet-linux-amd64 ] && chmod +x binaries/slipnet-linux-amd64
+            [ -f binaries/findns-linux-amd64 ] && chmod +x binaries/findns-linux-amd64
           fi
 
       - name: Build application
