@@ -127,6 +127,8 @@ If your server admin gives you a `slipnet://...` URL (from NoizDNS / SlipNet), y
 
 If you are not sure what NoizDNS/SlipNet is, you can safely ignore this option and keep the default **SlipStream** mode.
 
+**Deploying NoizDNS:** To deploy your own NoizDNS server, use **[noizdns-deploy](https://github.com/anonvector/noizdns-deploy)**.
+
 ### Setting Up a SlipStream Server
 
 To use SlipStream GUI, you need a SlipStream server running. For detailed instructions on deploying your own SlipStream server, check out:
@@ -471,6 +473,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔗 Related Projects
 
 - **[slipstream-rust-deploy](https://github.com/AliRezaBeigy/slipstream-rust-deploy)**: Deploy your own SlipStream server
+- **[noizdns-deploy](https://github.com/anonvector/noizdns-deploy)**: Deploy your own NoizDNS server
 - **[SlipNet](https://github.com/anonvector/SlipNet)**: Android VPN client with DNS tunneling (DNSTT, NoizDNS & Slipstream), NaiveProxy, SSH, Tor, and DoH — featuring a built-in DNS scanner
 - **[findns](https://github.com/SamNet-dev/findns)**: Fast DNS tunnel resolver scanner — find working resolvers for dnstt, DoH, and other DNS tunnel tools
 
