@@ -35,6 +35,7 @@ let socks5AuthUsername = '';
 let socks5AuthPassword = '';
 // Connection type: 'slipstream' (default) or 'slipnet' (NoizDNS)
 let connectionType = 'slipstream';
+let congestionControl = 'bbr';
 let slipnetUrl = ''; // slipnet://BASE64... URI
 let slipnetDns = ''; // optional --dns flag for SlipNet
 // System proxy lifecycle safety (only undo what THIS app enabled)
@@ -116,6 +117,7 @@ function loadSettings() {
       if (settings.connectionType === 'slipstream' || settings.connectionType === 'slipnet') connectionType = settings.connectionType;
       if (typeof settings.slipnetUrl === 'string') slipnetUrl = settings.slipnetUrl;
       if (typeof settings.slipnetDns === 'string') slipnetDns = settings.slipnetDns;
+      if (settings.congestionControl === 'bbr' || settings.congestionControl === 'dcubic') congestionControl = settings.congestionControl;
     }
   } catch (err) {
     console.error('Failed to load settings:', err);
@@ -145,6 +147,7 @@ function saveSettings(overrides = {}) {
       connectionType: overrides.connectionType ?? connectionType,
       slipnetUrl: overrides.slipnetUrl ?? slipnetUrl,
       slipnetDns: overrides.slipnetDns ?? slipnetDns,
+      congestionControl: overrides.congestionControl ?? congestionControl,
     };
 
     // Update in-memory state first so UI actions take effect immediately,
@@ -168,6 +171,7 @@ function saveSettings(overrides = {}) {
     connectionType = (next.connectionType === 'slipstream' || next.connectionType === 'slipnet') ? next.connectionType : 'slipstream';
     slipnetUrl = typeof next.slipnetUrl === 'string' ? next.slipnetUrl : '';
     slipnetDns = typeof next.slipnetDns === 'string' ? next.slipnetDns : '';
+    congestionControl = (next.congestionControl === 'bbr' || next.congestionControl === 'dcubic') ? next.congestionControl : 'bbr';
 
     fs.writeFileSync(settingsPath, JSON.stringify(next, null, 2));
   } catch (err) {
@@ -500,7 +504,7 @@ function startSlipstreamClient(resolver, domain) {
     }
   }
 
-  const args = ['--resolver', resolver, '--domain', domain];
+  const args = ['--resolver', resolver, '--domain', domain, '--congestion-control', congestionControl];
   
   slipstreamProcess = spawn(clientPath, args, {
     stdio: 'pipe',
@@ -1599,7 +1603,8 @@ ipcMain.handle('get-settings', () => {
     activeWorkspaceId,
     connectionType,
     slipnetUrl,
-    slipnetDns
+    slipnetDns,
+    congestionControl
   };
 });
 
@@ -1646,7 +1651,11 @@ ipcMain.handle('save-workspaces', (event, payload) => {
           : proxyBypassList,
         connectionType: (ws.connectionType === 'slipstream' || ws.connectionType === 'slipnet') ? ws.connectionType : 'slipstream',
         slipnetUrl: typeof ws.slipnetUrl === 'string' ? ws.slipnetUrl : '',
-        slipnetDns: typeof ws.slipnetDns === 'string' ? ws.slipnetDns : ''
+        slipnetDns: typeof ws.slipnetDns === 'string' ? ws.slipnetDns : '',
+        congestionControl: (ws.congestionControl === 'bbr' || ws.congestionControl === 'dcubic') ? ws.congestionControl : 'bbr',
+        socks5AuthEnabled: !!ws.socks5AuthEnabled,
+        socks5AuthUsername: typeof ws.socks5AuthUsername === 'string' ? ws.socks5AuthUsername : '',
+        socks5AuthPassword: typeof ws.socks5AuthPassword === 'string' ? ws.socks5AuthPassword : ''
       }));
 
     let nextActiveId =
@@ -1842,6 +1851,12 @@ ipcMain.handle('set-verbose', (event, verbose) => {
   verboseLogging = verbose;
   saveSettings({ verbose });
   return { success: true, verbose: verboseLogging };
+});
+
+ipcMain.handle('set-congestion-control', (event, value) => {
+  const cc = (value === 'bbr' || value === 'dcubic') ? value : 'bbr';
+  saveSettings({ congestionControl: cc });
+  return { success: true, congestionControl };
 });
 
 ipcMain.handle('set-socks5-auth', (event, auth) => {
@@ -2175,6 +2190,7 @@ ipcMain.handle('findns-scan', async (event, payload) => {
   const skipNxdomain = !!payload?.skipNxdomain;
   const useLocal = !!payload?.useLocal;
   const useDoh = !!payload?.doh;
+  const useProxy = !!payload?.useProxy;
 
   // Choose a writable working directory for temporary files (packaged apps cannot
   // write inside app.asar/resources).
@@ -2246,9 +2262,15 @@ ipcMain.handle('findns-scan', async (event, payload) => {
     if (useLocal) fetchArgs.push('--local');
     if (useDoh) fetchArgs.push('--doh');
 
+    const fetchEnv = { ...process.env };
+    if (useProxy && isRunning && httpProxyServer) {
+      fetchEnv.HTTP_PROXY = `http://127.0.0.1:${HTTP_PROXY_PORT}`;
+      fetchEnv.HTTPS_PROXY = `http://127.0.0.1:${HTTP_PROXY_PORT}`;
+    }
     const fetchProc = spawn(clientPath, fetchArgs, {
       cwd: workDir,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: fetchEnv
     });
 
     fetchProc.stderr.on('data', (d) => {

@@ -1758,6 +1758,17 @@
                                 <input type="text" class="form-input" id="domainInput" placeholder="s.example.com" value="s.example.com">
                             </div>
                         </div>
+
+                        <div class="settings-item">
+                            <div class="form-group">
+                                <label class="form-label">Congestion Control</label>
+                                <div class="connection-type-selector" id="congestionControlSelector">
+                                    <button class="conn-type-btn active" data-cc="bbr" onclick="setCongestionControl('bbr')">BBR</button>
+                                    <button class="conn-type-btn" data-cc="dcubic" onclick="setCongestionControl('dcubic')">dCUBIC</button>
+                                </div>
+                                <div class="settings-help">BBR optimizes for throughput; dCUBIC for fairness</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- SlipNet (NoizDNS) fields -->
@@ -1915,6 +1926,10 @@
                         <input type="checkbox" id="findnsSkipNx">
                         Skip NXDOMAIN check
                     </label>
+                    <label class="findns-toggle-item">
+                        <input type="checkbox" id="findnsUseProxy">
+                        Route through proxy
+                    </label>
                 </div>
 
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -1997,6 +2012,9 @@
                     <li><strong>Verbose Logging:</strong> Toggle detailed technical logs for debugging</li>
                     <li><strong>Test Connection:</strong> Verify your proxy is working with the test button</li>
                     <li><strong>Cross-Platform:</strong> Works on both macOS and Windows</li>
+                    <li><strong>Congestion Control:</strong> Choose between BBR (throughput) and dCUBIC (fairness) algorithms</li>
+                    <li><strong>Per-Preset SOCKS5 Auth:</strong> Each preset stores its own SOCKS5 username and password</li>
+                    <li><strong>FindNS Proxy Routing:</strong> Route FindNS downloads through the active VPN tunnel</li>
                 </ul>
             </div>
 
@@ -2015,6 +2033,8 @@
                     <li><strong>Configure System Proxy:</strong> Automatically configure your system to use the VPN for all apps</li>
                     <li><strong>DNS Resolver:</strong> The DNS server to use for domain name resolution (format: IP:Port)</li>
                     <li><strong>Domain:</strong> Your SlipStream server domain address</li>
+                    <li><strong>Congestion Control:</strong> BBR (default) optimizes for throughput; dCUBIC optimizes for fairness. Only applies to SlipStream mode.</li>
+                    <li><strong>SOCKS5 Authentication:</strong> Upstream SOCKS5 username/password, saved per preset</li>
                     <li><strong>Verbose Logging:</strong> Show detailed connection logs (useful for troubleshooting)</li>
                 </ul>
                 <p><strong>Note:</strong> Changes to DNS Resolver or Domain require restarting the VPN to take effect.</p>
@@ -2472,6 +2492,31 @@ SlipStream VPN Server</pre>
             }
         }
 
+        /* ============ CONGESTION CONTROL ============ */
+        let currentCongestionControl = 'bbr';
+
+        function setCongestionControl(cc) {
+            currentCongestionControl = cc;
+            document.querySelectorAll('#congestionControlSelector .conn-type-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.cc === cc);
+            });
+            scheduleCongestionControlSave();
+        }
+
+        let ccSaveTimer = null;
+        function scheduleCongestionControlSave() {
+            if (ccSaveTimer) clearTimeout(ccSaveTimer);
+            ccSaveTimer = setTimeout(() => saveCongestionControl(), 500);
+        }
+
+        async function saveCongestionControl() {
+            try {
+                await ipcRenderer.invoke('set-congestion-control', currentCongestionControl);
+            } catch (err) {
+                console.error('Failed to save congestion control:', err);
+            }
+        }
+
         /* ============ VPN CONTROLS ============ */
         async function startService() {
             try {
@@ -2612,9 +2657,10 @@ SlipStream VPN Server</pre>
             const doh = document.getElementById('findnsDoh')?.checked || false;
             const skipPing = document.getElementById('findnsSkipPing')?.checked || false;
             const skipNxdomain = document.getElementById('findnsSkipNx')?.checked || false;
+            const useProxy = document.getElementById('findnsUseProxy')?.checked || false;
 
             try {
-                const result = await ipcRenderer.invoke('findns-scan', { domain, top, useLocal, doh, skipPing, skipNxdomain });
+                const result = await ipcRenderer.invoke('findns-scan', { domain, top, useLocal, doh, skipPing, skipNxdomain, useProxy });
 
                 if (result.success && result.data) {
                     renderFindnsResults(result.data);
@@ -3020,6 +3066,13 @@ SlipStream VPN Server</pre>
                 }
                 document.getElementById('slipnetUrlInput').value = ws.slipnetUrl || '';
                 document.getElementById('slipnetDnsInput').value = ws.slipnetDns || '';
+                if (ws.congestionControl === 'bbr' || ws.congestionControl === 'dcubic') {
+                    setCongestionControl(ws.congestionControl);
+                }
+                document.getElementById('socks5AuthToggle').checked = !!ws.socks5AuthEnabled;
+                document.getElementById('socks5AuthUsername').value = ws.socks5AuthUsername || '';
+                document.getElementById('socks5AuthPassword').value = ws.socks5AuthPassword || '';
+                updateSocks5AuthVisibility();
             }
             renderWorkspaceTabs();
             persistWorkspaces();
@@ -3036,6 +3089,10 @@ SlipStream VPN Server</pre>
             ws.connectionType = currentConnectionType;
             ws.slipnetUrl = document.getElementById('slipnetUrlInput')?.value?.trim() || '';
             ws.slipnetDns = document.getElementById('slipnetDnsInput')?.value?.trim() || '';
+            ws.congestionControl = currentCongestionControl;
+            ws.socks5AuthEnabled = document.getElementById('socks5AuthToggle')?.checked || false;
+            ws.socks5AuthUsername = document.getElementById('socks5AuthUsername')?.value || '';
+            ws.socks5AuthPassword = document.getElementById('socks5AuthPassword')?.value || '';
         }
 
         async function addWorkspace() {
@@ -3053,7 +3110,11 @@ SlipStream VPN Server</pre>
                 proxyBypassList: (document.getElementById('proxyBypassInput')?.value || '').split('\n').map(s => s.trim()).filter(Boolean),
                 connectionType: currentConnectionType,
                 slipnetUrl: document.getElementById('slipnetUrlInput')?.value?.trim() || '',
-                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || ''
+                slipnetDns: document.getElementById('slipnetDnsInput')?.value?.trim() || '',
+                congestionControl: currentCongestionControl,
+                socks5AuthEnabled: document.getElementById('socks5AuthToggle')?.checked || false,
+                socks5AuthUsername: document.getElementById('socks5AuthUsername')?.value || '',
+                socks5AuthPassword: document.getElementById('socks5AuthPassword')?.value || ''
             };
             wsData.push(newWs);
             wsActiveId = id;
@@ -3090,6 +3151,13 @@ SlipStream VPN Server</pre>
                     }
                     document.getElementById('slipnetUrlInput').value = next.slipnetUrl || '';
                     document.getElementById('slipnetDnsInput').value = next.slipnetDns || '';
+                    if (next.congestionControl === 'bbr' || next.congestionControl === 'dcubic') {
+                        setCongestionControl(next.congestionControl);
+                    }
+                    document.getElementById('socks5AuthToggle').checked = !!next.socks5AuthEnabled;
+                    document.getElementById('socks5AuthUsername').value = next.socks5AuthUsername || '';
+                    document.getElementById('socks5AuthPassword').value = next.socks5AuthPassword || '';
+                    updateSocks5AuthVisibility();
                 }
             }
             renderWorkspaceTabs();
@@ -3126,6 +3194,13 @@ SlipStream VPN Server</pre>
                     }
                     document.getElementById('slipnetUrlInput').value = ws.slipnetUrl || settings.slipnetUrl || '';
                     document.getElementById('slipnetDnsInput').value = ws.slipnetDns || settings.slipnetDns || '';
+                    if (ws.congestionControl === 'bbr' || ws.congestionControl === 'dcubic') {
+                        setCongestionControl(ws.congestionControl);
+                    }
+                    document.getElementById('socks5AuthToggle').checked = !!ws.socks5AuthEnabled;
+                    document.getElementById('socks5AuthUsername').value = ws.socks5AuthUsername || '';
+                    document.getElementById('socks5AuthPassword').value = ws.socks5AuthPassword || '';
+                    updateSocks5AuthVisibility();
                 }
             }
             renderWorkspaceTabs();
@@ -3204,6 +3279,10 @@ SlipStream VPN Server</pre>
             }
             if (settings.slipnetUrl) document.getElementById('slipnetUrlInput').value = settings.slipnetUrl;
             if (settings.slipnetDns) document.getElementById('slipnetDnsInput').value = settings.slipnetDns;
+
+            if (settings.congestionControl === 'bbr' || settings.congestionControl === 'dcubic') {
+                setCongestionControl(settings.congestionControl);
+            }
 
             const socksUserEl = document.getElementById('socks5AuthUsername');
             const socksPassEl = document.getElementById('socks5AuthPassword');
