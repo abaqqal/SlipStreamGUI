@@ -425,16 +425,17 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Find the previous release tag
-          CURRENT="v${{ steps.get_version.outputs.VERSION }}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${CURRENT}$" | head -n 1)
+          # Get the commit SHA of the previous release (using gh to find the last release tag)
+          PREV_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
 
-          if [ -z "$PREV_TAG" ]; then
-            # No previous tag — list all commits
-            LOG=$(git log --pretty=format:"- %s" -n 50)
-          else
+          if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
             LOG=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s")
+          else
+            # No previous release — list recent commits
+            LOG=$(git log --pretty=format:"- %s" -n 50)
           fi
 
           if [ -z "$LOG" ]; then
