@@ -38,6 +38,7 @@ let connectionType = 'slipstream';
 let congestionControl = 'bbr';
 let slipnetUrl = ''; // slipnet://BASE64... URI
 let slipnetDns = ''; // optional --dns flag for SlipNet
+let autoRestartEnabled = false;
 // System proxy lifecycle safety (only undo what THIS app enabled)
 let systemProxyEnabledByApp = false;
 let systemProxyServiceName = '';
@@ -118,6 +119,7 @@ function loadSettings() {
       if (typeof settings.slipnetUrl === 'string') slipnetUrl = settings.slipnetUrl;
       if (typeof settings.slipnetDns === 'string') slipnetDns = settings.slipnetDns;
       if (settings.congestionControl === 'bbr' || settings.congestionControl === 'dcubic') congestionControl = settings.congestionControl;
+      if (settings.autoRestartEnabled !== undefined) autoRestartEnabled = !!settings.autoRestartEnabled;
     }
   } catch (err) {
     console.error('Failed to load settings:', err);
@@ -148,6 +150,7 @@ function saveSettings(overrides = {}) {
       slipnetUrl: overrides.slipnetUrl ?? slipnetUrl,
       slipnetDns: overrides.slipnetDns ?? slipnetDns,
       congestionControl: overrides.congestionControl ?? congestionControl,
+      autoRestartEnabled: overrides.autoRestartEnabled ?? autoRestartEnabled,
     };
 
     // Update in-memory state first so UI actions take effect immediately,
@@ -172,6 +175,7 @@ function saveSettings(overrides = {}) {
     slipnetUrl = typeof next.slipnetUrl === 'string' ? next.slipnetUrl : '';
     slipnetDns = typeof next.slipnetDns === 'string' ? next.slipnetDns : '';
     congestionControl = (next.congestionControl === 'bbr' || next.congestionControl === 'dcubic') ? next.congestionControl : 'bbr';
+    autoRestartEnabled = !!next.autoRestartEnabled;
 
     fs.writeFileSync(settingsPath, JSON.stringify(next, null, 2));
   } catch (err) {
@@ -187,6 +191,9 @@ let tunManager = null;
 let systemProxyConfigured = false; // Track system proxy state
 let cleanupInProgress = false;
 let quitting = false;
+let autoRestartTimer = null;
+let autoRestartAttempts = 0;
+let lastServiceConfig = null;
 
 function canSendToWindow() {
   return !!(
@@ -508,12 +515,26 @@ function startSlipstreamClient(resolver, domain) {
   if (!mtuEstimate.ok) {
     throw new Error(`Invalid server domain. ${mtuEstimate.error}`);
   }
+  const resolverList = parseDnsServers(resolver);
+  if (!resolverList.ok) {
+    throw new Error(resolverList.error);
+  }
   safeSend(
     'slipstream-log',
     `SlipStream client MTU auto-derived from domain length (${mtuEstimate.domainLength} chars): ${mtuEstimate.mtu} bytes`
   );
+  if (resolverList.resolvers.length > 1) {
+    safeSend(
+      'slipstream-log',
+      `Using ${resolverList.resolvers.length} DNS resolvers for SlipStream: ${resolverList.normalized}`
+    );
+  }
 
-  const args = ['--resolver', resolver, '--domain', domain, '--congestion-control', congestionControl];
+  const args = [
+    ...resolverList.resolvers.flatMap((item) => ['--resolver', item.serverForNode]),
+    '--domain', domain,
+    '--congestion-control', congestionControl
+  ];
   
   slipstreamProcess = spawn(clientPath, args, {
     stdio: 'pipe',
@@ -562,8 +583,12 @@ function startSlipstreamClient(resolver, domain) {
     console.log(`Slipstream process exited with code ${code}`);
     slipstreamProcess = null;
     safeSend('slipstream-exit', code);
+    const shouldAutoRestart = isRunning && autoRestartEnabled && !!lastServiceConfig;
+    if (shouldAutoRestart) {
+      scheduleAutoRestart(code);
+    }
     sendStatusUpdate();
-    if (isRunning) {
+    if (isRunning && !shouldAutoRestart) {
       // If SlipStream dies unexpectedly, ensure we also undo system proxy if we enabled it.
       void cleanupAndDisableProxyIfNeeded('slipstream-exit');
     }
@@ -616,6 +641,76 @@ function estimateSlipstreamClientMtu(domain) {
     return { ok: false, error: 'MTU computed to zero; check domain length.', domainLength };
   }
   return { ok: true, mtu, domainLength };
+}
+
+function parseDnsServers(input) {
+  const parts = String(input || '')
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    return { ok: false, error: 'At least one DNS resolver is required.' };
+  }
+
+  const seen = new Set();
+  const resolvers = [];
+  for (const part of parts) {
+    const parsed = parseDnsServer(part);
+    if (!parsed) {
+      return {
+        ok: false,
+        error: `Invalid DNS resolver "${part}". Use IPv4 or IPv4:port (for example 1.1.1.1:53).`
+      };
+    }
+    if (seen.has(parsed.serverForNode)) continue;
+    seen.add(parsed.serverForNode);
+    resolvers.push(parsed);
+  }
+
+  return {
+    ok: true,
+    resolvers,
+    normalized: resolvers.map((item) => item.serverForNode).join(', ')
+  };
+}
+
+function clearAutoRestartTimer() {
+  if (autoRestartTimer) {
+    clearTimeout(autoRestartTimer);
+    autoRestartTimer = null;
+  }
+}
+
+function scheduleAutoRestart(exitCode) {
+  clearAutoRestartTimer();
+  if (!autoRestartEnabled || !isRunning || !lastServiceConfig) return;
+
+  autoRestartAttempts += 1;
+  const delayMs = Math.min(3000 * autoRestartAttempts, 15000);
+  safeSend(
+    'slipstream-log',
+    `VPN client exited unexpectedly (code ${exitCode}). Auto-restart attempt ${autoRestartAttempts} in ${Math.round(delayMs / 1000)}s.`
+  );
+
+  autoRestartTimer = setTimeout(async () => {
+    autoRestartTimer = null;
+    if (!autoRestartEnabled || !isRunning || slipstreamProcess || !lastServiceConfig) return;
+
+    try {
+      if (lastServiceConfig.connectionType === 'slipnet') {
+        await startSlipnetClient(lastServiceConfig.slipnetUrl, lastServiceConfig.slipnetDns, null);
+      } else {
+        await startSlipstreamClient(lastServiceConfig.resolver, lastServiceConfig.domain);
+      }
+      autoRestartAttempts = 0;
+      safeSend('slipstream-log', 'Auto-restart succeeded.');
+      sendStatusUpdate();
+    } catch (err) {
+      safeSend('slipstream-error', `Auto-restart failed: ${err?.message || String(err)}`);
+      sendStatusUpdate();
+      scheduleAutoRestart('retry');
+    }
+  }, delayMs);
 }
 
 function sendStatusUpdate() {
@@ -1379,6 +1474,15 @@ async function startService(resolver, domain, tunMode = false) {
       resolver = RESOLVER;
       domain = DOMAIN;
     }
+    lastServiceConfig = {
+      resolver,
+      domain,
+      connectionType,
+      slipnetUrl,
+      slipnetDns
+    };
+    clearAutoRestartTimer();
+    autoRestartAttempts = 0;
 
     // Start the appropriate client based on connection type
     if (connectionType === 'slipnet') {
@@ -1480,6 +1584,8 @@ function getStatusDetails() {
 }
 
 function stopService() {
+  clearAutoRestartTimer();
+  autoRestartAttempts = 0;
   isRunning = false;
   
   // Stop TUN mode if active
@@ -1629,7 +1735,8 @@ ipcMain.handle('get-settings', () => {
     connectionType,
     slipnetUrl,
     slipnetDns,
-    congestionControl
+    congestionControl,
+    autoRestartEnabled
   };
 });
 
@@ -1882,6 +1989,12 @@ ipcMain.handle('set-congestion-control', (event, value) => {
   const cc = (value === 'bbr' || value === 'dcubic') ? value : 'bbr';
   saveSettings({ congestionControl: cc });
   return { success: true, congestionControl };
+});
+
+ipcMain.handle('set-auto-restart', (event, value) => {
+  const enabled = !!value;
+  saveSettings({ autoRestartEnabled: enabled });
+  return { success: true, autoRestartEnabled };
 });
 
 ipcMain.handle('set-socks5-auth', (event, auth) => {

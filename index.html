@@ -1700,6 +1700,19 @@
                     </div>
 
                     <div class="settings-item">
+                        <div class="settings-row">
+                            <div>
+                                <div class="settings-item-label">Auto Restart</div>
+                                <div class="settings-item-desc">Restart the VPN client automatically if it exits unexpectedly</div>
+                            </div>
+                            <label class="toggle-container">
+                                <input type="checkbox" id="autoRestartToggle" onchange="toggleAutoRestart()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-item">
                         <div class="form-group">
                             <label class="form-label">Proxy Bypass List</label>
                             <textarea class="form-input" id="proxyBypassInput" rows="2" placeholder="*.example.com&#10;192.168.1.0/24" style="font-size: 12px;"></textarea>
@@ -1748,7 +1761,8 @@
                         <div class="settings-item">
                             <div class="form-group">
                                 <label class="form-label">DNS Resolver</label>
-                                <input type="text" class="form-input" id="resolverInput" placeholder="8.8.8.8:53" value="8.8.8.8:53">
+                                <textarea class="form-input" id="resolverInput" rows="2" placeholder="1.1.1.1:53&#10;8.8.8.8:53" style="font-size: 12px;">8.8.8.8:53</textarea>
+                                <div class="settings-help">SlipStream accepts one or more DNS resolvers here. Separate entries with spaces, commas, or new lines.</div>
                             </div>
                         </div>
 
@@ -2415,6 +2429,23 @@ SlipStream VPN Server</pre>
             } else {
                 addLog('Failed to ' + (enable ? 'configure' : 'unconfigure') + ' system proxy', true);
                 toggle.checked = !enable;
+            }
+        }
+
+        async function toggleAutoRestart() {
+            const toggle = document.getElementById('autoRestartToggle');
+            const enable = toggle.checked;
+            try {
+                const result = await ipcRenderer.invoke('set-auto-restart', enable);
+                if (result?.success) {
+                    addLog(`Auto restart ${enable ? 'enabled' : 'disabled'}`, false, true);
+                } else {
+                    toggle.checked = !enable;
+                    addLog('Failed to update auto restart setting', true);
+                }
+            } catch (err) {
+                toggle.checked = !enable;
+                addLog('Error: Failed to update auto restart setting', true);
             }
         }
 
@@ -3317,6 +3348,7 @@ SlipStream VPN Server</pre>
             if (settings.domain) document.getElementById('domainInput').value = settings.domain;
             updateSlipstreamMtuHint();
             if (settings.verbose !== undefined) document.getElementById('verboseToggle').checked = settings.verbose;
+            if (settings.autoRestartEnabled !== undefined) document.getElementById('autoRestartToggle').checked = !!settings.autoRestartEnabled;
             if (settings.socks5AuthEnabled !== undefined) document.getElementById('socks5AuthToggle').checked = !!settings.socks5AuthEnabled;
             if (settings.socks5AuthUsername !== undefined) document.getElementById('socks5AuthUsername').value = settings.socks5AuthUsername || '';
             if (settings.socks5AuthPassword !== undefined) document.getElementById('socks5AuthPassword').value = settings.socks5AuthPassword || '';

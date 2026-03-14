@@ -42,7 +42,7 @@
 ## 👀 Tour
 
 - **Install** the app from the latest release
-- **Set your server** (`Domain`) and `DNS Resolver` (or keep defaults for testing)
+- **Set your server** (`Domain`) and `DNS Resolver` (one or more, separated by spaces/commas/new lines)
 - **DNS Checker (optional)**: run it, and click **"Use"** on any **OK** row to set your `DNS Resolver`
 - **FindNS Scanner (advanced, NoizDNS users)**: open **FindNS** from the header to scan public DNS resolvers for tunnel compatibility and click **"Use"** to apply a result as your `DNS Resolver`
 - **Start VPN** and watch the **Status** indicators turn “Running”
@@ -223,6 +223,8 @@ bash <(curl -Ls https://raw.githubusercontent.com/AliRezaBeigy/slipstream-rust-d
 - 🧪 **Connection Testing**: Built-in proxy connection tester
 - 📊 **Real-Time Status**: Monitor VPN connection status at a glance
 - 🌐 **Concurrent DNS Checker**: Tests many DNS servers at once and lets you apply any **OK** result with one click
+- 🔁 **Auto Restart**: Optionally restart the VPN client automatically if the tunnel process exits unexpectedly
+- 🧩 **Multi-Resolver SlipStream**: Enter multiple DNS resolvers for SlipStream and pass them through to the upstream client
 - 🛰️ **NoizDNS (SlipNet) Mode**: Alternate connection mode for DNS-tunnel transports using `slipnet://` URLs
 - 🧭 **FindNS Scanner**: Fetches and ranks public DNS resolvers for tunnels, auto-downloads resolver lists from `SamNet-dev/findns`, and lets you apply a result directly as your `DNS Resolver`
 - 🚀 **Congestion Control**: Choose between BBR (throughput-optimized, default) and dCUBIC (fairness-optimized) algorithms for SlipStream connections

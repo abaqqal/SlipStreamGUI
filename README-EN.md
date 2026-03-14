@@ -10,7 +10,7 @@
 ## 👀 Quick Tour
 
 - **Download & install** the app from the Releases page
-- **Set your server** (`Domain`) and **DNS Resolver** (if needed)
+- **Set your server** (`Domain`) and **DNS Resolver** (one or more, separated by spaces/commas/new lines)
 - **DNS Checker (optional)**: run it, and click **"Use"** on any **OK** row to set your `DNS Resolver`
 - **FindNS Scanner (advanced)**: use the **FindNS** button in the header to scan public DNS resolvers for tunnels and apply the best result as your `DNS Resolver`
 - **Save as Preset**: save your configuration as a named preset for quick switching later
@@ -189,6 +189,8 @@ The app features a modern, professional redesign:
 
 - **Light & Dark Theme**: switch between light and dark mode using the theme toggle button in the header. Your preference is saved automatically.
 - **Presets (Workspaces)**: save multiple configurations (resolver, domain, bypass list) as named presets. Quickly switch between them with a single click. Create, rename, and delete presets from the preset bar above the action buttons.
+- **Auto Restart**: optionally restart the VPN client automatically if the tunnel process exits unexpectedly.
+- **Multi-Resolver SlipStream**: provide more than one DNS resolver for SlipStream by separating them with spaces, commas, or new lines.
 - **Polished UI**: sidebar-style layout, status cards with animated indicators, SVG icons on buttons, and smooth transitions throughout.
 
 ### Using Presets
