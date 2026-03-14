@@ -1756,6 +1756,7 @@
                             <div class="form-group">
                                 <label class="form-label">Server Domain</label>
                                 <input type="text" class="form-input" id="domainInput" placeholder="s.example.com" value="s.example.com">
+                                <div class="settings-help" id="slipstreamMtuHint">SlipStream client MTU is auto-derived from the server domain length.</div>
                             </div>
                         </div>
 
@@ -2461,6 +2462,44 @@ SlipStream VPN Server</pre>
         /* ============ CONNECTION TYPE ============ */
         let currentConnectionType = 'slipstream';
 
+        function estimateSlipstreamMtu(domain) {
+            const normalized = String(domain || '').trim();
+            const domainLength = normalized.length;
+            if (!normalized) {
+                return { ok: false, error: 'Enter a server domain to estimate the SlipStream client MTU.', domainLength };
+            }
+            if (domainLength >= 240) {
+                return { ok: false, error: `Domain is too long for SlipStream DNS transport (${domainLength}/239 characters).`, domainLength };
+            }
+            const mtu = Math.floor((240 - domainLength) / 1.6);
+            if (mtu <= 0) {
+                return { ok: false, error: 'Estimated MTU is zero. Shorten the server domain.', domainLength };
+            }
+            return { ok: true, mtu, domainLength };
+        }
+
+        function updateSlipstreamMtuHint() {
+            const hintEl = document.getElementById('slipstreamMtuHint');
+            const domain = document.getElementById('domainInput')?.value?.trim() || '';
+            if (!hintEl) return;
+
+            if (currentConnectionType !== 'slipstream') {
+                hintEl.textContent = 'SlipStream client MTU is auto-derived from the server domain length when SlipStream mode is active.';
+                hintEl.style.color = 'var(--text-muted)';
+                return;
+            }
+
+            const estimate = estimateSlipstreamMtu(domain);
+            if (!estimate.ok) {
+                hintEl.textContent = estimate.error;
+                hintEl.style.color = 'var(--danger)';
+                return;
+            }
+
+            hintEl.textContent = `Client MTU is auto-derived: ${estimate.mtu} bytes for ${estimate.domainLength} domain characters. Shorter domains leave more room for DNS transport.`;
+            hintEl.style.color = 'var(--text-muted)';
+        }
+
         function setConnectionType(type) {
             currentConnectionType = type;
             // Update button styles
@@ -2470,6 +2509,7 @@ SlipStream VPN Server</pre>
             // Show/hide field groups
             document.getElementById('slipstreamFields').style.display = type === 'slipstream' ? 'block' : 'none';
             document.getElementById('slipnetFields').style.display = type === 'slipnet' ? 'block' : 'none';
+            updateSlipstreamMtuHint();
             // Persist
             scheduleConnectionTypeSave();
         }
@@ -2545,6 +2585,8 @@ SlipStream VPN Server</pre>
                 await saveConnectionType();
             } else {
                 if (!resolver || !domain) { addLog('Error: Please fill in all settings', true); return; }
+                const mtuEstimate = estimateSlipstreamMtu(domain);
+                if (!mtuEstimate.ok) { addLog('Error: ' + mtuEstimate.error, true); return; }
             }
 
             const servicePayload = {
@@ -3073,6 +3115,7 @@ SlipStream VPN Server</pre>
                 document.getElementById('socks5AuthUsername').value = ws.socks5AuthUsername || '';
                 document.getElementById('socks5AuthPassword').value = ws.socks5AuthPassword || '';
                 updateSocks5AuthVisibility();
+                updateSlipstreamMtuHint();
             }
             renderWorkspaceTabs();
             persistWorkspaces();
@@ -3158,6 +3201,7 @@ SlipStream VPN Server</pre>
                     document.getElementById('socks5AuthUsername').value = next.socks5AuthUsername || '';
                     document.getElementById('socks5AuthPassword').value = next.socks5AuthPassword || '';
                     updateSocks5AuthVisibility();
+                    updateSlipstreamMtuHint();
                 }
             }
             renderWorkspaceTabs();
@@ -3201,6 +3245,7 @@ SlipStream VPN Server</pre>
                     document.getElementById('socks5AuthUsername').value = ws.socks5AuthUsername || '';
                     document.getElementById('socks5AuthPassword').value = ws.socks5AuthPassword || '';
                     updateSocks5AuthVisibility();
+                    updateSlipstreamMtuHint();
                 }
             }
             renderWorkspaceTabs();
@@ -3213,7 +3258,10 @@ SlipStream VPN Server</pre>
                 wsFieldTimer = setTimeout(() => persistWorkspaces(), 800);
             }
             if (resolverEl) resolverEl.addEventListener('input', scheduleWsSave);
-            if (domainEl) domainEl.addEventListener('input', scheduleWsSave);
+            if (domainEl) {
+                domainEl.addEventListener('input', scheduleWsSave);
+                domainEl.addEventListener('input', updateSlipstreamMtuHint);
+            }
             const bypassEl = document.getElementById('proxyBypassInput');
             if (bypassEl) bypassEl.addEventListener('input', scheduleWsSave);
         }
@@ -3267,6 +3315,7 @@ SlipStream VPN Server</pre>
             const settings = await ipcRenderer.invoke('get-settings');
             if (settings.resolver) document.getElementById('resolverInput').value = settings.resolver;
             if (settings.domain) document.getElementById('domainInput').value = settings.domain;
+            updateSlipstreamMtuHint();
             if (settings.verbose !== undefined) document.getElementById('verboseToggle').checked = settings.verbose;
             if (settings.socks5AuthEnabled !== undefined) document.getElementById('socks5AuthToggle').checked = !!settings.socks5AuthEnabled;
             if (settings.socks5AuthUsername !== undefined) document.getElementById('socks5AuthUsername').value = settings.socks5AuthUsername || '';

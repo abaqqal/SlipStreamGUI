@@ -504,6 +504,15 @@ function startSlipstreamClient(resolver, domain) {
     }
   }
 
+  const mtuEstimate = estimateSlipstreamClientMtu(domain);
+  if (!mtuEstimate.ok) {
+    throw new Error(`Invalid server domain. ${mtuEstimate.error}`);
+  }
+  safeSend(
+    'slipstream-log',
+    `SlipStream client MTU auto-derived from domain length (${mtuEstimate.domainLength} chars): ${mtuEstimate.mtu} bytes`
+  );
+
   const args = ['--resolver', resolver, '--domain', domain, '--congestion-control', congestionControl];
   
   slipstreamProcess = spawn(clientPath, args, {
@@ -591,6 +600,22 @@ function startSlipstreamClient(resolver, domain) {
       }, 2000);
     });
   });
+}
+
+function estimateSlipstreamClientMtu(domain) {
+  const normalized = String(domain || '').trim();
+  const domainLength = normalized.length;
+  if (!normalized) {
+    return { ok: false, error: 'Domain is required.', domainLength };
+  }
+  if (domainLength >= 240) {
+    return { ok: false, error: 'Domain name is too long for DNS transport.', domainLength };
+  }
+  const mtu = Math.floor((240 - domainLength) / 1.6);
+  if (mtu <= 0) {
+    return { ok: false, error: 'MTU computed to zero; check domain length.', domainLength };
+  }
+  return { ok: true, mtu, domainLength };
 }
 
 function sendStatusUpdate() {
